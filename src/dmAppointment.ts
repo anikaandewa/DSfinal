@@ -1,355 +1,239 @@
-import "./styles.css";
-import * as React from "react";
-import * as ReactDOM from "react-dom";
-import { createMachine, assign, actions, State } from "xstate";
-import { useMachine } from "@xstate/react";
-import { inspect } from "@xstate/inspect";
-import { dmMachine } from "./dmAppointment";
+import { MachineConfig, send, Action, assign } from "xstate";
+import { LEMMAS } from "./wordbank"
+import { LEGAL } from "./wordbank"
 
-import createSpeechRecognitionPonyfill from "web-speech-cognitive-services/lib/SpeechServices/SpeechToText";
-import createSpeechSynthesisPonyfill from "web-speech-cognitive-services/lib/SpeechServices/TextToSpeech";
-
-const { send, cancel } = actions;
-
-const TOKEN_ENDPOINT =
-  "https://northeurope.api.cognitive.microsoft.com/sts/v1.0/issuetoken";
-const REGION = "northeurope";
-
-if (process.env.NODE_ENV === "development") {
-  inspect({
-    iframe: false,
-  });
+function say(text: string): Action<SDSContext, SDSEvent> {
+  return send((_context: SDSContext) => ({ type: "SPEAK", value: text }));
 }
 
-const defaultPassivity = 3;
+let listOfUsedWords: string[] = []
 
-const machine = createMachine(
+const findWord = (context: SDSContext, entity: string) => {
+  // lowercase the utterance and remove tailing "."
+  let u = context.recResult[0].utterance.toLowerCase().replace(/\.$/g, "");
+  listOfUsedWords.push(u)
+  console.log(listOfUsedWords)
+  let psi = u.substr(u.length - 1) // the last letter of the word provided by user
+  let siupsiup = LEMMAS.filter((k) => k[0] === psi) // retrieves words from lemmas that start with the letter in psi
+  const randIndex = Math.floor(Math.random() * siupsiup.length); // gives a random index among the retrieved words
+  const word = siupsiup[randIndex];
+  let unusedWords = LEMMAS.filter(word => !listOfUsedWords.includes(word))
+  if (listOfUsedWords.includes(word))
   {
-    predictableActionArguments: true,
-    schema: {
-      context: {} as SDSContext,
-      events: {} as SDSEvent,
-    },
-    id: "root",
-    type: "parallel",
-    states: {
-      dm: {
-        ...dmMachine,
-      },
+    if (!((unusedWords.filter(word => word.startsWith(psi))).length === 0)) {
+    let word1 = unusedWords[Math.floor(Math.random() * unusedWords.length)]
+    listOfUsedWords.push(word1)
+    return [word1, (listOfUsedWords.length/2)]
+  }
+  return "My mind draws a blank. Victory is yours this day, mortal."
+}
+  else {
+    listOfUsedWords.push(word)
+    return [word, (listOfUsedWords.length/2)]
+  }
+};
 
-      asrtts: {
-        initial: "init",
-        states: {
-          init: {
-            on: {
-              CLICK: {
-                target: "getToken",
-                actions: [
-                  "createAudioContext",
-                  (context) =>
-                    navigator.mediaDevices
-                      .getUserMedia({ audio: true })
-                      .then(function (stream) {
-                        context.audioCtx.createMediaStreamSource(stream);
-                      }),
-                ],
-              },
-            },
+const findErrors = (context: SDSContext, entity: string) => {
+  // lowercase the utterance and remove tailing "."
+  let u = context.recResult[0].utterance.toLowerCase().replace(/\.$/g, "");
+  console.log(listOfUsedWords)
+  if (listOfUsedWords.length > 0) {
+    let lastWord = listOfUsedWords[listOfUsedWords.length - 1];
+  let lastLetter = lastWord[lastWord.length - 1];
+  let firstLetter = u[0];
+  if (!LEGAL.includes(u)) { 
+    return ["not legal", (listOfUsedWords.length/2)];
+  } 
+  else if (firstLetter !== lastLetter) {
+    return ["no match", (listOfUsedWords.length/2)];
+  }
+else {
+  return false
+}
+  }
+  if (!LEGAL.includes(u)) {
+    return ["not legal", (listOfUsedWords.length/2)];
+  }
+else {
+  return false
+}
+};
+
+export const dmMachine: MachineConfig<SDSContext, any, SDSEvent> = {
+  initial: "idle",
+  states: {
+    idle: {
+      on: {
+        CLICK: "init",
+      },
+    },
+    init: {
+      on: {
+        TTS_READY: "welcome",
+        CLICK: "welcome",
+      },
+    },
+    welcome: {
+      initial: "prompt",
+      on: {
+        RECOGNISED: [
+          {
+            target: "giveword",
+            cond: (context) => findErrors(context, "title") === false,
+            actions: assign({
+              title: (context) => findWord(context, "title"),
+            }),
           },
-          getToken: {
-            invoke: {
-              id: "getAuthorizationToken",
-              src: (context) =>
-                getAuthorizationToken(context.parameters.azureKey!),
-              onDone: {
-                actions: ["assignToken", "ponyfillASR"],
-                target: "ponyfillTTS",
-              },
-              onError: {
-                target: "fail",
-              },
-            },
+          {
+            target: "endgame_nomatch_start",
+            cond: (context) => findErrors(context, "title")[0] === "no match",
           },
-          ponyfillTTS: {
-            invoke: {
-              id: "ponyTTS",
-              src: (context, _event) => (callback, _onReceive) => {
-                const ponyfill = createSpeechSynthesisPonyfill({
-                  audioContext: context.audioCtx,
-                  credentials: {
-                    region: REGION,
-                    authorizationToken: context.azureAuthorizationToken,
-                  },
-                });
-                const { speechSynthesis, SpeechSynthesisUtterance } = ponyfill;
-                context.tts = speechSynthesis;
-                context.ttsUtterance = SpeechSynthesisUtterance;
-                context.tts.addEventListener("voiceschanged", () => {
-                  context.tts.cancel();
-                  const voices = context.tts.getVoices();
-                  const voiceRe = RegExp(context.parameters.ttsVoice, "u");
-                  const voice = voices.find((v: any) => voiceRe.test(v.name))!;
-                  if (voice) {
-                    context.voice = voice;
-                    callback("TTS_READY");
-                  } else {
-                    console.error(
-                      `TTS_ERROR: Could not get voice for regexp ${voiceRe}`
-                    );
-                    callback("TTS_ERROR");
-                  }
-                });
-              },
-            },
-            on: {
-              TTS_READY: "idle",
-              TTS_ERROR: "fail",
-            },
+          {
+            target: "endgame_illegal_start",
+            cond: (context) => findErrors(context, "title")[0] === "not legal",
           },
-          idle: {
-            on: {
-              LISTEN: "recognising",
-              SPEAK: {
-                target: "speaking",
-                actions: "assignAgenda",
-              },
-            },
+          {
+            target: ".nomatch",
           },
-          recognising: {
-            initial: "noinput",
-            exit: "recStop",
-            on: {
-              ASRRESULT: {
-                actions: "assignRecResult",
-                target: ".match",
-              },
-              RECOGNISED: { target: "idle", actions: "recLogResult" },
-              SELECT: "idle",
-            },
-            states: {
-              noinput: {
-                entry: [
-                  "recStart",
-                  send(
-                    { type: "TIMEOUT" },
-                    {
-                      delay: (_context: SDSContext) => 1000 * defaultPassivity,
-                      id: "timeout",
-                    }
-                  ),
-                ],
-                on: {
-                  TIMEOUT: "#root.asrtts.idle",
-                  STARTSPEECH: "inprogress",
-                },
-                exit: cancel("timeout"),
-              },
-              inprogress: {},
-              match: {
-                entry: send("RECOGNISED"),
-              },
-            },
-          },
-          speaking: {
-            entry: "ttsStart",
-            on: {
-              ENDSPEECH: "idle",
-              SELECT: "idle",
-              CLICK: { target: "idle", actions: "sendEndspeech" },
-            },
-            exit: "ttsStop",
-          },
-          fail: {},
+        ],
+        TIMEOUT: ".prompt",
+      },
+      states: {
+        prompt: {
+          entry: say("Welcome to the game of enchanted word chains, young mortal. You shall now spill the first word!"),
+          on: { ENDSPEECH: "ask" },
+        },
+        ask: {
+          entry: send("LISTEN"),
+        },
+        nomatch: {
+          entry: say(
+            "Sorry, I don't know what it is. Tell me something I know."
+          ),
+          on: { ENDSPEECH: "ask" },
         },
       },
     },
-  },
-  {
-    guards: {
-      prob: (_context, _event, { cond }: any) => {
-        let rnd = Math.random();
-        return rnd >= cond.threshold ? true : false;
-      },
-    },
-    actions: {
-      createAudioContext: (context: SDSContext) => {
-        context.audioCtx = new ((window as any).AudioContext ||
-          (window as any).webkitAudioContext)();
-        navigator.mediaDevices
-          .getUserMedia({ audio: true })
-          .then(function (stream) {
-            context.audioCtx.createMediaStreamSource(stream);
-          });
-      },
-      assignToken: assign({
-        azureAuthorizationToken: (_context, event: any) => event.data,
-      }),
-      assignAgenda: assign({
-        ttsAgenda: (_context, event: any) => event.value,
-      }),
-      assignRecResult: assign({
-        recResult: (_context, event: any) => event.value,
-      }),
-      sendEndspeech: send("ENDSPEECH"),
-      recLogResult: (context: SDSContext) => {
-        console.log("U>", context.recResult[0]["utterance"], {
-          confidence: context.recResult[0]["confidence"],
-        });
-      },
-      changeColour: (context) => {
-        let color = context.recResult[0].utterance
-          .toLowerCase()
-          .replace(/[\W_]+/g, "");
-        console.log(`(repaiting to ${color})`);
-        document.body.style.backgroundColor = color;
-      },
-    },
-  }
-);
-
-let list1: string[] = []
-
-function App({ domElement }: any) {
-  const externalContext = {
-    parameters: {
-      ttsVoice: domElement.getAttribute("data-tts-voice") || "en-US",
-      ttsLexicon: domElement.getAttribute("data-tts-lexicon"),
-      asrLanguage: domElement.getAttribute("data-asr-language") || "en-US",
-      azureKey: domElement.getAttribute("data-azure-key"),
-    },
-  };
-  const [state, send] = useMachine(machine, {
-    context: { ...machine.context, ...externalContext },
-    devTools: process.env.NODE_ENV === "development" ? true : false,
-    actions: {
-      recStart: (context) => {
-        context.asr.start();
-        /* console.log('Ready to receive a voice input.'); */
-      },
-      recStop: (context) => {
-        context.asr.abort?.();
-        /* console.log('Recognition stopped.'); */
-      },
-      ttsStart: (context) => {
-        let content = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xmlns:mstts="http://www.w3.org/2001/mstts" xml:lang="en-US"><voice name="${context.voice.name}">`;
-        content =
-          content +
-          (context.parameters.ttsLexicon
-            ? `<lexicon uri="${context.parameters.ttsLexicon}"/>`
-            : "");
-        content = content + `${context.ttsAgenda}</voice></speak>`;
-        const utterance = new context.ttsUtterance(content);
-        console.log("S>", context.ttsAgenda);
-        list1.push(context.ttsAgenda)
-        utterance.voice = context.voice;
-        utterance.onend = () => send("ENDSPEECH");
-        context.tts.speak(utterance);
-      },
-      ttsStop: (context) => {
-        /* console.log('TTS STOP...'); */
-        context.tts.cancel();
-      },
-      ponyfillASR: (context) => {
-        const { SpeechRecognition } = createSpeechRecognitionPonyfill({
-          audioContext: context.audioCtx,
-          credentials: {
-            region: REGION,
-            authorizationToken: context.azureAuthorizationToken,
+    giveword: {
+      id: "giveword",
+      initial: "prompt",
+      on: {
+        RECOGNISED: [
+          {
+            target: "giveword2",
+            cond: (context) => findErrors(context, "title") === false,
+            actions: assign({
+              title: (context) => findWord(context, "title"),
+            }),
           },
-        });
-        context.asr = new SpeechRecognition();
-        context.asr.lang = context.parameters.asrLanguage || "en-US";
-        context.asr.continuous = true;
-        context.asr.interimResults = true;
-        context.asr.onresult = function (event: any) {
-          var result = event.results[0];
-          if (result.isFinal) {
-            send({
-              type: "ASRRESULT",
-              value: [
-                {
-                  utterance: result[0].transcript,
-                  confidence: result[0].confidence,
-                },
-              ],
-            });
-          } else {
-            send({ type: "STARTSPEECH" });
-          }
-        };
+          {
+            target: "endgame_nomatch",
+            cond: (context) => findErrors(context, "title")[0] === "no match",
+          },
+          {
+            target: "endgame_illegal",
+            cond: (context) => findErrors(context, "title")[0] === "not legal",
+          },
+          {
+            target: ".nomatch",
+          },
+        ],
+        TIMEOUT: "#outOfTime",
+      },
+      states: {
+        outOfTime: {
+          id: "outOfTime",
+          entry: send((context) => ({
+              type: "SPEAK",
+              value: `Tick-tock, your time has run out! You lose, my dear. Your pitiful score is ${context.title[1]}.`,
+            })),
+            },
+        prompt: {
+          entry: send((context) => ({
+            type: "SPEAK",
+            value: `${context.title[0]}`,
+          })),
+          on: { ENDSPEECH: "ask" },
+        },
+        ask: {
+          entry: send("LISTEN"),
+        },
+        nomatch: {
+          entry: say(
+            "Sorry, I don't know what it is. Tell me something I know."
+          ),
+          on: { ENDSPEECH: "ask" },
+        },
       },
     },
-  });
-
-  switch (true) {
-    default:
-      return (
-        <div className="App">
-          <ReactiveButton
-            state={state}
-            key={machine.id}
-            alternative={{}}
-            onClick={() => send("CLICK")}
-          />
-        </div>
-      );
-  }
-}
-
-interface Props extends React.HTMLAttributes<HTMLElement> {
-  state: State<SDSContext, any, any, any, any>;
-  alternative: any;
-}
-const ReactiveButton = (props: Props): JSX.Element => {
-  var promptText = "\u00A0";
-  var circleClass = "circle";
-  switch (true) {
-    case props.state.matches({ asrtts: "fail" }) ||
-      props.state.matches({ dm: "fail" }):
-      break;
-    case props.state.matches({ asrtts: "recognising" }):
-      circleClass = "circle-recognising";
-      promptText = "Listenin'";
-      break;
-    case props.state.matches({ asrtts: "speaking" }):
-      circleClass = "circle-speaking";
-      promptText = list1[list1.length -1];
-      break;
-    case props.state.matches({ dm: "idle" }):
-      promptText = "Welcome to the game of enchanted word chains, young mortal. You shall now spill the first word!";
-      circleClass = "circle-click";
-      break;
-    case props.state.matches({ dm: "init" }):
-      promptText = "Welcome to the game of enchanted word chains, young mortal. You shall now spill the first word!";
-      circleClass = "circle-click";
-      break;
-    default:
-      promptText = "\u00A0";
-  }
-  return (
-    <div className="control">
-      <div className="status">
-        <button
-          type="button"
-          className={circleClass}
-          style={{}}
-          {...props}
-        ></button>
-        <div className="status-text">{promptText}</div>
-      </div>
-    </div>
-  );
-};
-
-const getAuthorizationToken = (azureKey: string) =>
-  fetch(
-    new Request(TOKEN_ENDPOINT, {
-      method: "POST",
-      headers: {
-        "Ocp-Apim-Subscription-Key": azureKey,
+    giveword2: {
+      id: "giveword",
+      initial: "prompt",
+      on: {
+        RECOGNISED: [
+          {
+            target: "giveword",
+            cond: (context) => findErrors(context, "title") === false,
+            actions: assign({
+              title: (context) => findWord(context, "title"),
+            }),
+          },
+          {
+            target: "endgame_nomatch",
+            cond: (context) => findErrors(context, "title")[0] === "no match",
+          },
+          {
+            target: "endgame_illegal",
+            cond: (context) => findErrors(context, "title")[0] === "not legal",
+          },
+          {
+            target: ".nomatch",
+          },
+        ],
+        TIMEOUT: "#outOfTime",
       },
-    })
-  ).then((data) => data.text());
-
-const rootElement = document.getElementById("speechstate");
-ReactDOM.render(<App domElement={rootElement} />, rootElement);
+      states: {
+        prompt: {
+          entry: send((context) => ({
+            type: "SPEAK",
+            value: `${context.title[0]}`,
+          })),
+          on: { ENDSPEECH: "ask" },
+        },
+        ask: {
+          entry: send("LISTEN"),
+        },
+        nomatch: {
+          entry: say(
+            "Sorry, I don't know what it is. Tell me something I know."
+          ),
+          on: { ENDSPEECH: "ask" },
+        },
+      },
+    },
+    endgame_nomatch: {
+      entry: send((context) => ({
+        type: "SPEAK",
+        value: `Your feeble attempt didn't match my word. You lose, and your score shall be ${context.title[1]}`,
+      })),
+    },
+    endgame_illegal: {
+      entry: send((context) => ({
+        type: "SPEAK",
+        value: `Ha! Your puny word does not match my vast knowledge of the arcane lexicon. You lose, fool! Your score is ${context.title[1]}`,
+      })),
+    },
+    endgame_nomatch_start: {
+      entry: send((context) => ({
+        type: "SPEAK",
+        value: `Your feeble attempt didn't match my word. You lose, and your score shall be 0`,
+      })),
+    },
+    endgame_illegal_start: {
+      entry: send((context) => ({
+        type: "SPEAK",
+        value: `Ha! Your puny word does not match my vast knowledge of the arcane lexicon. You lose, fool! Your score is 0`,
+      })),
+    },
+  },
+};
