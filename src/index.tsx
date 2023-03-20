@@ -21,7 +21,7 @@ if (process.env.NODE_ENV === "development") {
   });
 }
 
-const defaultPassivity = 5;
+const defaultPassivity = 3;
 
 const machine = createMachine(
   {
@@ -125,7 +125,6 @@ const machine = createMachine(
               },
               RECOGNISED: { target: "idle", actions: "recLogResult" },
               SELECT: "idle",
-              CLICK: ".pause",
             },
             states: {
               noinput: {
@@ -148,10 +147,6 @@ const machine = createMachine(
               inprogress: {},
               match: {
                 entry: send("RECOGNISED"),
-              },
-              pause: {
-                entry: "recStop",
-                on: { CLICK: "noinput" },
               },
             },
           },
@@ -222,9 +217,6 @@ const ReactiveButton = (props: Props): JSX.Element => {
   switch (true) {
     case props.state.matches({ asrtts: "fail" }) ||
       props.state.matches({ dm: "fail" }):
-      break;
-    case props.state.matches({ asrtts: { recognising: "pause" } }):
-      promptText = "Click to continue";
       break;
     case props.state.matches({ asrtts: "recognising" }):
       circleClass = "circle-recognising";
