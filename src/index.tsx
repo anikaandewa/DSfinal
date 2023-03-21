@@ -231,7 +231,7 @@ function App({ domElement }: any) {
         /* console.log('Recognition stopped.'); */
       },
       ttsStart: (context) => {
-        let content = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xmlns:mstts="http://www.w3.org/2001/mstts" xml:lang="en-US"><voice name="${context.voice.name}">`;
+        let content = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xmlns:mstts="http://www.w3.org/2001/mstts" xml:lang="en-US"><voice name="en-US-NancyNeural">`;
         content =
           content +
           (context.parameters.ttsLexicon
@@ -327,6 +327,30 @@ const ReactiveButton = (props: Props): JSX.Element => {
         "Welcome to the game of enchanted word chains, young mortal. You shall now spill the first word!";
       circleClass = "circle-click";
       break;
+    case props.state.matches({ dm: "endgame_nomatch"}):
+      promptText = list1[list1.length - 1];
+      circleClass = "circle-click";
+      break;
+    case props.state.matches({ dm: "endgame_illegal"}):
+      promptText = list1[list1.length - 1];
+      circleClass = "circle-click";
+      break;
+    case props.state.matches({ dm: "endgame_nomatch_start"}):
+      promptText = list1[list1.length - 1];
+      circleClass = "circle-click";
+      break;
+    case props.state.matches({ dm: "endgame_illegal_start"}):
+      promptText = list1[list1.length - 1];
+      circleClass = "circle-click";
+      break;
+    case props.state.matches({ dm: "giveword.outOfTime"}):
+      promptText = list1[list1.length - 1];
+      circleClass = "circle-click";
+      break;
+    case props.state.matches({ dm: "giveword2.outOfTime"}):
+      promptText = list1[list1.length - 1];
+      circleClass = "circle-click";
+      break;
     default:
       promptText = "\u00A0";
   }
@@ -343,6 +367,11 @@ const ReactiveButton = (props: Props): JSX.Element => {
           {(props.state.matches({ asrtts: "recognising" }) || props.state.matches({ dm: "init" }) || props.state.matches({ dm: "idle" })) && (
           <div className='another-image'>
             <img src="https://cdn.discordapp.com/attachments/698599823678636053/1081214589447983154/export.PNG" alt="Another Image" className="image1" />
+          </div>
+        )}
+          {(props.state.matches({ asrtts: "speaking" }) && props.state.matches({ dm: "endgame_nomatch" }) || props.state.matches({ dm: "endgame_nomatch" }) || props.state.matches({ dm: "endgame_illegal" }) || props.state.matches({ dm: "endgame_nomatch_start" }) || props.state.matches({ dm: "endgame_illegal_start" }) || props.state.matches({ dm: "giveword.outOfTime" }) || props.state.matches({ dm: "giveword2.outOfTime" })) && (
+          <div className='yet-another-image'>
+            <img src="asking.png" alt="Losing" className="image2" />
           </div>
         )}
         </div>
