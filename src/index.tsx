@@ -300,9 +300,11 @@ interface Props extends React.HTMLAttributes<HTMLElement> {
   state: State<SDSContext, any, any, any, any>;
   alternative: any;
 }
+
 const ReactiveButton = (props: Props): JSX.Element => {
   var promptText = "\u00A0";
   var circleClass = "circle";
+
   switch (true) {
     case props.state.matches({ asrtts: "fail" }) ||
       props.state.matches({ dm: "fail" }):
@@ -313,33 +315,44 @@ const ReactiveButton = (props: Props): JSX.Element => {
       break;
     case props.state.matches({ asrtts: "speaking" }):
       circleClass = "circle-speaking";
-      promptText = list1[list1.length -1];
+      promptText = list1[list1.length - 1];
       break;
     case props.state.matches({ dm: "idle" }):
-      promptText = "Welcome to the game of enchanted word chains, young mortal. You shall now spill the first word!";
+      promptText =
+        "Welcome to the game of enchanted word chains, young mortal. You shall now spill the first word!";
       circleClass = "circle-click";
       break;
     case props.state.matches({ dm: "init" }):
-      promptText = "Welcome to the game of enchanted word chains, young mortal. You shall now spill the first word!";
+      promptText =
+        "Welcome to the game of enchanted word chains, young mortal. You shall now spill the first word!";
       circleClass = "circle-click";
       break;
     default:
       promptText = "\u00A0";
   }
+
   return (
     <div className="control">
       <div className="status">
-        <button
-          type="button"
-          className={circleClass}
-          style={{}}
-          {...props}
-        ></button>
-        <div className="status-text">{promptText}</div>
+        <button type="button" className={circleClass} style={{}} {...props}></button>
+        <div className="status-text">
+          {promptText}
+          {props.state.matches({ asrtts: "speaking" }) && (<div className='witch-asking'>
+            <img src="https://cdn.discordapp.com/attachments/698599823678636053/1081207911465877505/export.png" alt="Recognising" className="image" /></div>
+          )}
+          {(props.state.matches({ asrtts: "recognising" }) || props.state.matches({ dm: "init" }) || props.state.matches({ dm: "idle" })) && (
+          <div className='another-image'>
+            <img src="https://cdn.discordapp.com/attachments/698599823678636053/1081214589447983154/export.PNG" alt="Another Image" className="image1" />
+          </div>
+        )}
+        </div>
       </div>
     </div>
   );
 };
+
+export default ReactiveButton;
+
 
 const getAuthorizationToken = (azureKey: string) =>
   fetch(
