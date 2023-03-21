@@ -1,44 +1,56 @@
-@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@1,300;1,700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Beth+Ellen&display=swap");
 * {
   margin: 0;
   padding: 0;
 }
 
+
 html, body {
   height: 100vh;
-  background: rgba(179, 164, 195, 0.7);
+  background: hsla(282, 69%, 86%, 0.4);
 }
 
 .App {
-  font-family: IBM Plex Mono, monospace;
+  font-family: 'Beth Ellen', cursive;
   text-align: center;
   margin: 0;
   padding: 0;
-  width: 100%;
+  width: 60%;
   height: 100vh;
   background: hsla(90deg, 25%, 85%, 0.7);
 }
 
 .image {
-  width: 1000px; /* set the width to 50 pixels */
-  height: 1000px; /* set the height to 50 pixels */
+  width: 1000px; 
+  height: 1000px;
 }
 
 .image {
-  position: fixed; /* set the position to absolute */
-  top: 10px; /* set the distance from the top to 10 pixels */
-  left: 600px; /* set the distance from the left to 10 pixels */
+  position: fixed;
+  top: -30px; 
+  left: 600px;
 }
 
 .image1 {
-  width: 1000px; /* set the width to 50 pixels */
-  height: 1000px; /* set the height to 50 pixels */
+  width: 1000px;
+  height: 1000px;
 }
 
 .image1 {
-  position: fixed; /* set the position to absolute */
-  top: 10px; /* set the distance from the top to 10 pixels */
-  left: 600px; /* set the distance from the left to 10 pixels */
+  position: fixed;
+  top: -30px;
+  left: 600px;
+}
+
+.image2 {
+  width: 1000px;
+  height: 1000px;
+}
+
+.image2 {
+  position: fixed;
+  top: -30px;
+  left: 600px;
 }
 
 .control {
@@ -60,11 +72,11 @@ html, body {
 .control .status, .control .status-talk {
   bottom: 0;
   padding-top: 10vh;
-  padding-left: 50px;
+  padding-left: 150px;
   padding-right: 20px;
   width: 100vw;
-  font-family: IBM Plex Mono, monospace;
-  font-style: italic;
+  font-family: 'Beth Ellen', cursive;
+  font-style: normal;
   font-weight: light;
   font-size: 20pt;
   text-align: left;
@@ -78,25 +90,68 @@ html, body {
 }
 .control .circle, .control .circle-recognising, .control .circle-speaking, .control .circle-click {
   position: absolute;
-  width: 80px;
-  height: 80px;
-  left: -40px;
+  width: 100px;
+  height: 100px;
+  top: 38px;
+  left: 20px;
+  opacity: 0.05;
   border-radius: 50px;
   cursor: pointer;
   border: 0;
-  background-color: #CD1515;
-  z-index: 0;
+  background-color: hsla(282, 69%, 86%, 0.4);
+  z-index: 2;
+}
+.cauldron {
+  position: absolute;
+  width: 100px;
+  height: 100px;
+  margin-top: 40px;
+  top: 5px;
+  left: 20px;
+  border-radius: 50px;
+  cursor: pointer;
+  border: 0;
+  z-index: 1;
 }
 .control .circle-click {
   border: 0px;
   background-color: #fff;
 }
-.control .circle-speaking {
+
+.control .image1 .classy-perfect {
+  position: absolute;
+  width: 500px;
+  height: 500px;
+  margin-top: 40px;
+  top: 5px;
+  left: 500px;
+  border-radius: 50px;
+  cursor: pointer;
+  border: 0;
+  z-index: 1;
+}
+
+.control .image2 .unclassy-bla {
+  position: absolute;
+  width: 400px;
+  height: 400px;
+  margin-top: 40px;
+  top: 5px;
+  left: 500px;
+  border-radius: 50px;
+  cursor: pointer;
+  border: 0;
+  z-index: 1;
+}
+
+
+
+.control .circle-speaking .img1 {
   border: 0px;
   background-color: #fff;
   animation: bordering 2s infinite;
 }
-.control .circle-recognising {
+.control .circle-recognising .img {
   animation: bordersize 2s infinite;
 }
 
